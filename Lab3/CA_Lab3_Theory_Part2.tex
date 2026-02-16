@@ -1,0 +1,828 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,calc}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{CA Lab 3 -- Theory Document (Part 2)}
+\lhead{ToyRISC ISA Specification}
+\cfoot{\thepage}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{javastyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single
+}
+
+\lstdefinestyle{asmstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue}\bfseries,
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    frame=single,
+    morekeywords={add,addi,sub,subi,mul,muli,div,divi,and,andi,or,ori,xor,xori,slt,slti,sll,slli,srl,srli,sra,srai,load,store,jmp,beq,bne,blt,bgt,end}
+}
+
+\title{\Huge\bfseries Comprehensive Theory of Single-Cycle Processor Design and the ToyRISC ISA\\[1em]
+\Large Part 2: ToyRISC ISA Deep Dive and Instruction Encoding}
+\author{Computer Architecture Laboratory -- Assignment 3}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ===========================================================================
+\section{ToyRISC ISA Overview}
+% ===========================================================================
+
+The ToyRISC ISA is a custom RISC instruction set architecture designed for educational purposes. It is inspired by RISC-V (RV32I) and shares many design principles with it. The ISA is clean, minimal, and regular, making it suitable for building a processor simulator from scratch.
+
+\subsection{Key Characteristics}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{32-bit fixed-width instructions}: Every instruction is exactly 32 bits, simplifying the fetch and decode logic.
+    \item \textbf{32 general-purpose registers}: Named \texttt{x0} through \texttt{x31}, each 32 bits wide.
+    \item \textbf{Load-store architecture}: Only \texttt{load} and \texttt{store} access memory. All computations occur between registers.
+    \item \textbf{30 distinct operations}: Including arithmetic, logical, memory, control flow, and a special \texttt{end} instruction.
+    \item \textbf{3 instruction formats}: R3-Type, R2I-Type, and RI-Type.
+    \item \textbf{5-bit opcode}: Allows for up to $2^5 = 32$ unique opcodes (30 are used, leaving 2 reserved).
+    \item \textbf{Word-addressable memory}: $2^{16} = 65536$ addressable words.
+\end{itemize}
+
+% ===========================================================================
+\section{Instruction Formats -- Detailed Encoding}
+% ===========================================================================
+
+ToyRISC defines three instruction formats. The opcode is always in the most significant 5 bits (bits 31--27). The remaining 27 bits are interpreted differently based on the format.
+
+\subsection{R3-Type (Register-Register-Register)}
+
+Used by arithmetic/logical instructions that operate on \textbf{three registers} (two sources, one destination).
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Bits 31--27} & \textbf{Bits 26--22} & \textbf{Bits 21--17} & \textbf{Bits 16--12} & \textbf{Bits 11--0} \\
+\hline
+opcode (5) & rs1 (5) & rs2 (5) & rd (5) & unused (12) \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{opcode} (5 bits, [31:27]): Identifies the operation (e.g., 00000 for \texttt{add}).
+    \item \textbf{rs1} (5 bits, [26:22]): First source register number.
+    \item \textbf{rs2} (5 bits, [21:17]): Second source register number.
+    \item \textbf{rd} (5 bits, [16:12]): Destination register number.
+    \item \textbf{unused} (12 bits, [11:0]): Not used; set to 0.
+\end{itemize}
+
+\textbf{Example}: \texttt{add \%x3, \%x4, \%x5} (opcode=00000, rs1=00011, rs2=00100, rd=00101)
+
+Binary encoding:
+\[
+\underbrace{00000}_{\text{add}}\;\underbrace{00011}_{\text{x3}}\;\underbrace{00100}_{\text{x4}}\;\underbrace{00101}_{\text{x5}}\;\underbrace{000000000000}_{\text{unused}}
+\]
+
+Decimal: Each field contributes to the 32-bit integer value stored in memory.
+
+\subsubsection{Bit Extraction Formulas for R3-Type}
+
+To decode an R3-Type instruction from a 32-bit integer \texttt{instr}:
+
+\begin{align}
+\text{opcode} &= (\texttt{instr} \gg 27) \;\&\; \texttt{0x1F} \\
+\text{rs1} &= (\texttt{instr} \gg 22) \;\&\; \texttt{0x1F} \\
+\text{rs2} &= (\texttt{instr} \gg 17) \;\&\; \texttt{0x1F} \\
+\text{rd} &= (\texttt{instr} \gg 12) \;\&\; \texttt{0x1F}
+\end{align}
+
+In Java: \texttt{int opcode = (instr >>> 27) \& 0x1F;}
+
+\subsection{R2I-Type (Register-Register-Immediate)}
+
+Used by arithmetic/logical instructions with an immediate value, memory instructions, and conditional branches.
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Bits 31--27} & \textbf{Bits 26--22} & \textbf{Bits 21--17} & \textbf{Bits 16--0} \\
+\hline
+opcode (5) & rs1 (5) & rd (5) & immediate (17) \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{opcode} (5 bits, [31:27]): Identifies the operation.
+    \item \textbf{rs1} (5 bits, [26:22]): Source register number.
+    \item \textbf{rd} (5 bits, [21:17]): Destination register number.
+    \item \textbf{immediate} (17 bits, [16:0]): Signed immediate value (two's complement). Range: $-2^{16}$ to $2^{16} - 1$ (i.e., $-65536$ to $65535$).
+\end{itemize}
+
+\textbf{Note}: For R2I-Type, the ISA specification states that immediate values are placed in \texttt{sourceOperand2} in the ParsedProgram representation. This is critical for the Operand Fetch implementation.
+
+\subsubsection{Sign Extension of 17-bit Immediate}
+
+The 17-bit immediate must be sign-extended to 32 bits before use:
+
+\begin{lstlisting}[style=javastyle, caption={Sign extension of 17-bit immediate}]
+int imm17 = instr & 0x1FFFF;   // extract lower 17 bits
+// Sign extend: if bit 16 is set, the value is negative
+if ((imm17 & (1 << 16)) != 0) {
+    imm17 = imm17 | 0xFFFE0000; // fill upper 15 bits with 1s
+}
+\end{lstlisting}
+
+Alternatively, using arithmetic shift:
+\begin{lstlisting}[style=javastyle]
+int imm17 = (instr << 15) >> 15; // shift left, then arith right
+\end{lstlisting}
+
+\subsubsection{Bit Extraction Formulas for R2I-Type}
+
+\begin{align}
+\text{opcode} &= (\texttt{instr} \gg 27) \;\&\; \texttt{0x1F} \\
+\text{rs1} &= (\texttt{instr} \gg 22) \;\&\; \texttt{0x1F} \\
+\text{rd} &= (\texttt{instr} \gg 17) \;\&\; \texttt{0x1F} \\
+\text{imm} &= \text{signExtend}_{17 \to 32}(\texttt{instr} \;\&\; \texttt{0x1FFFF})
+\end{align}
+
+\subsection{RI-Type (Register-Immediate)}
+
+Used by the \texttt{jmp} and \texttt{end} instructions.
+
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Bits 31--27} & \textbf{Bits 26--22} & \textbf{Bits 21--0} \\
+\hline
+opcode (5) & rd (5) & immediate (22) \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{opcode} (5 bits, [31:27]): Identifies the operation.
+    \item \textbf{rd} (5 bits, [26:22]): Destination register (used by \texttt{jmp}; unused by \texttt{end}).
+    \item \textbf{immediate} (22 bits, [21:0]): Signed immediate value. Range: $-2^{21}$ to $2^{21} - 1$.
+\end{itemize}
+
+\subsubsection{Bit Extraction Formulas for RI-Type}
+
+\begin{align}
+\text{opcode} &= (\texttt{instr} \gg 27) \;\&\; \texttt{0x1F} \\
+\text{rd} &= (\texttt{instr} \gg 22) \;\&\; \texttt{0x1F} \\
+\text{imm} &= \text{signExtend}_{22 \to 32}(\texttt{instr} \;\&\; \texttt{0x3FFFFF})
+\end{align}
+
+\subsection{Opcode-to-Format Mapping}
+
+Not all opcodes use the same format. Here is the complete mapping:
+
+\begin{longtable}{p{1.5cm}p{2cm}p{2cm}p{7cm}}
+\toprule
+\textbf{Opcode} & \textbf{Binary} & \textbf{Format} & \textbf{Operation} \\
+\midrule
+0 & 00000 & R3-Type & \texttt{add} rd = rs1 + rs2 \\
+1 & 00001 & R2I-Type & \texttt{addi} rd = rs1 + imm \\
+2 & 00010 & R3-Type & \texttt{sub} rd = rs1 - rs2 \\
+3 & 00011 & R2I-Type & \texttt{subi} rd = rs1 - imm \\
+4 & 00100 & R3-Type & \texttt{mul} rd = rs1 $\times$ rs2 \\
+5 & 00101 & R2I-Type & \texttt{muli} rd = rs1 $\times$ imm \\
+6 & 00110 & R3-Type & \texttt{div} rd = rs1 $\div$ rs2 \\
+7 & 00111 & R2I-Type & \texttt{divi} rd = rs1 $\div$ imm \\
+8 & 01000 & R3-Type & \texttt{and} rd = rs1 \& rs2 \\
+9 & 01001 & R2I-Type & \texttt{andi} rd = rs1 \& imm \\
+10 & 01010 & R3-Type & \texttt{or} rd = rs1 $|$ rs2 \\
+11 & 01011 & R2I-Type & \texttt{ori} rd = rs1 $|$ imm \\
+12 & 01100 & R3-Type & \texttt{xor} rd = rs1 $\oplus$ rs2 \\
+13 & 01101 & R2I-Type & \texttt{xori} rd = rs1 $\oplus$ imm \\
+14 & 01110 & R3-Type & \texttt{slt} rd = (rs1 $<$ rs2) ? 1 : 0 \\
+15 & 01111 & R2I-Type & \texttt{slti} rd = (rs1 $<$ imm) ? 1 : 0 \\
+16 & 10000 & R3-Type & \texttt{sll} rd = rs1 $\ll$ rs2 \\
+17 & 10001 & R2I-Type & \texttt{slli} rd = rs1 $\ll$ imm \\
+18 & 10010 & R3-Type & \texttt{srl} rd = rs1 $\ggg$ rs2 (logical) \\
+19 & 10011 & R2I-Type & \texttt{srli} rd = rs1 $\ggg$ imm (logical) \\
+20 & 10100 & R3-Type & \texttt{sra} rd = rs1 $\gg$ rs2 (arithmetic) \\
+21 & 10101 & R2I-Type & \texttt{srai} rd = rs1 $\gg$ imm (arithmetic) \\
+22 & 10110 & R2I-Type & \texttt{load} rd = mem[rs1 + imm] \\
+23 & 10111 & R2I-Type & \texttt{store} mem[rd + imm] = rs1 \\
+24 & 11000 & RI-Type & \texttt{jmp} PC = PC + rd + imm \\
+25 & 11001 & R2I-Type & \texttt{beq} if rs1==rd, PC = PC + imm \\
+26 & 11010 & R2I-Type & \texttt{bne} if rs1$\neq$rd, PC = PC + imm \\
+27 & 11011 & R2I-Type & \texttt{blt} if rs1$<$rd, PC = PC + imm \\
+28 & 11100 & R2I-Type & \texttt{bgt} if rs1$>$rd, PC = PC + imm \\
+29 & 11101 & RI-Type & \texttt{end} terminate execution \\
+\bottomrule
+\end{longtable}
+
+\textbf{Pattern}: Even opcodes (0, 2, 4, ..., 20) are R3-Type (register-register). Odd opcodes (1, 3, 5, ..., 21) are R2I-Type (register-immediate). Opcodes 22--28 are memory and branch instructions (all R2I-Type). Opcodes 24 and 29 are RI-Type.
+
+% ===========================================================================
+\section{Detailed Instruction Semantics}
+% ===========================================================================
+
+\subsection{Arithmetic Instructions}
+
+\subsubsection{add / addi -- Addition}
+
+\begin{tcolorbox}[colback=blue!5, colframe=blue!50!black]
+\textbf{add} \texttt{\%rs1, \%rs2, \%rd} $\quad\Rightarrow\quad$ \texttt{rd = rs1 + rs2}
+
+\textbf{addi} \texttt{\%rs1, imm, \%rd} $\quad\Rightarrow\quad$ \texttt{rd = rs1 + imm}
+\end{tcolorbox}
+
+Addition of two 32-bit signed integers. If the result exceeds 32 bits (overflow), the upper 32 bits are stored in \texttt{x31}. In Java, integer overflow wraps around naturally (two's complement), so the lower 32 bits are in the result and the overflow can be detected by computing the full 64-bit result using \texttt{long}:
+
+\begin{lstlisting}[style=javastyle]
+long result64 = (long)op1 + (long)op2;
+int result32 = (int)result64;            // lower 32 bits
+int overflow = (int)(result64 >> 32);    // upper 32 bits -> x31
+\end{lstlisting}
+
+\subsubsection{sub / subi -- Subtraction}
+
+\begin{tcolorbox}[colback=blue!5, colframe=blue!50!black]
+\textbf{sub} \texttt{\%rs1, \%rs2, \%rd} $\quad\Rightarrow\quad$ \texttt{rd = rs1 - rs2}
+
+\textbf{subi} \texttt{\%rs1, imm, \%rd} $\quad\Rightarrow\quad$ \texttt{rd = rs1 - imm}
+\end{tcolorbox}
+
+Similar to addition but performs subtraction. Overflow handling is analogous.
+
+\textbf{Common pattern}: \texttt{sub \%x3, \%x3, \%x3} sets \texttt{x3 = 0}. This is equivalent to \texttt{add \%x0, \%x0, \%x3} and is a standard idiom for clearing a register.
+
+\subsubsection{mul / muli -- Multiplication}
+
+\begin{tcolorbox}[colback=blue!5, colframe=blue!50!black]
+\textbf{mul} \texttt{\%rs1, \%rs2, \%rd} $\quad\Rightarrow\quad$ \texttt{rd = (rs1 * rs2)[31:0]}, \texttt{x31 = (rs1 * rs2)[63:32]}
+
+\textbf{muli} \texttt{\%rs1, imm, \%rd} $\quad\Rightarrow\quad$ \texttt{rd = (rs1 * imm)[31:0]}, \texttt{x31 = (rs1 * imm)[63:32]}
+\end{tcolorbox}
+
+Multiplying two 32-bit integers produces a 64-bit result. The lower 32 bits go to \texttt{rd}, and the upper 32 bits go to \texttt{x31}.
+
+\begin{lstlisting}[style=javastyle]
+long result64 = (long)op1 * (long)op2;
+int rd_value = (int)result64;
+int x31_value = (int)(result64 >> 32);
+\end{lstlisting}
+
+\subsubsection{div / divi -- Division}
+
+\begin{tcolorbox}[colback=blue!5, colframe=blue!50!black]
+\textbf{div} \texttt{\%rs1, \%rs2, \%rd} $\quad\Rightarrow\quad$ \texttt{rd = rs1 / rs2} (quotient), \texttt{x31 = rs1 \% rs2} (remainder)
+
+\textbf{divi} \texttt{\%rs1, imm, \%rd} $\quad\Rightarrow\quad$ \texttt{rd = rs1 / imm}, \texttt{x31 = rs1 \% imm}
+\end{tcolorbox}
+
+Integer division. The quotient goes to \texttt{rd} and the remainder goes to \texttt{x31}. This is heavily used in the palindrome and prime test programs.
+
+\begin{lstlisting}[style=javastyle]
+int rd_value = op1 / op2;   // integer division (truncates)
+int x31_value = op1 % op2;  // remainder
+\end{lstlisting}
+
+\subsection{Logical Instructions}
+
+\subsubsection{and / andi -- Bitwise AND}
+
+\begin{tcolorbox}[colback=green!5, colframe=green!50!black]
+\texttt{rd = rs1 \& rs2} \quad or \quad \texttt{rd = rs1 \& imm}
+\end{tcolorbox}
+
+Performs bitwise AND. Each bit of the result is 1 only if the corresponding bits of both operands are 1.
+
+\textbf{Use case}: Masking -- extracting specific bits from a value. For example, \texttt{andi \%x3, 1, \%x4} extracts the least significant bit of \texttt{x3}.
+
+\subsubsection{or / ori -- Bitwise OR}
+
+\begin{tcolorbox}[colback=green!5, colframe=green!50!black]
+\texttt{rd = rs1 | rs2} \quad or \quad \texttt{rd = rs1 | imm}
+\end{tcolorbox}
+
+Performs bitwise OR. Each bit of the result is 1 if either corresponding bit is 1.
+
+\textbf{Use case}: Setting specific bits. For example, \texttt{ori \%x3, 0x80, \%x3} sets bit 7 of \texttt{x3}.
+
+\subsubsection{xor / xori -- Bitwise XOR}
+
+\begin{tcolorbox}[colback=green!5, colframe=green!50!black]
+\texttt{rd = rs1 $\oplus$ rs2} \quad or \quad \texttt{rd = rs1 $\oplus$ imm}
+\end{tcolorbox}
+
+Performs bitwise exclusive OR. The result bit is 1 if the input bits differ.
+
+\textbf{Use case}: Toggling bits, computing parity, and encryption.
+
+\subsection{Comparison Instructions}
+
+\subsubsection{slt / slti -- Set Less Than}
+
+\begin{tcolorbox}[colback=purple!5, colframe=purple!50!black]
+\texttt{rd = (rs1 < rs2) ? 1 : 0} \quad or \quad \texttt{rd = (rs1 < imm) ? 1 : 0}
+\end{tcolorbox}
+
+Compares two signed integers. If \texttt{rs1} is less than \texttt{rs2} (or \texttt{imm}), the result is 1; otherwise 0.
+
+\textbf{Use case}: Building complex control flow. For example, checking if a value is within a range.
+
+\subsection{Shift Instructions}
+
+\subsubsection{sll / slli -- Shift Left Logical}
+
+\begin{tcolorbox}[colback=orange!5, colframe=orange!50!black]
+\texttt{rd = rs1 << rs2} (or \texttt{<< imm})
+
+\texttt{x31 = bits shifted out}
+\end{tcolorbox}
+
+Shifts all bits of \texttt{rs1} to the left by \texttt{rs2} (or \texttt{imm}) positions. Zeros are filled in from the right. The bits shifted out (from the left) are stored in \texttt{x31}.
+
+\textbf{Mathematical effect}: Left shifting by $n$ is equivalent to multiplication by $2^n$.
+
+\begin{lstlisting}[style=javastyle]
+int rd_value = op1 << shiftAmount;
+int x31_value = op1 >>> (32 - shiftAmount); // bits shifted out
+\end{lstlisting}
+
+\subsubsection{srl / srli -- Shift Right Logical}
+
+\begin{tcolorbox}[colback=orange!5, colframe=orange!50!black]
+\texttt{rd = rs1 >>> rs2} (logical right shift)
+
+\texttt{x31 = bits shifted out}
+\end{tcolorbox}
+
+Shifts all bits to the right. Zeros are filled in from the left (regardless of sign). The bits shifted out (from the right) are stored in \texttt{x31}.
+
+In Java, \texttt{>>>} is the unsigned/logical right shift operator.
+
+\begin{lstlisting}[style=javastyle]
+int rd_value = op1 >>> shiftAmount;
+int x31_value = op1 << (32 - shiftAmount); // bits shifted out
+\end{lstlisting}
+
+\subsubsection{sra / srai -- Shift Right Arithmetic}
+
+\begin{tcolorbox}[colback=orange!5, colframe=orange!50!black]
+\texttt{rd = rs1 >> rs2} (arithmetic right shift, preserves sign)
+
+\texttt{x31 = bits shifted out}
+\end{tcolorbox}
+
+Shifts all bits to the right, but fills the left with copies of the \textbf{sign bit} (MSB). This preserves the sign of negative numbers.
+
+\textbf{Mathematical effect}: Arithmetic right shifting by $n$ is equivalent to division by $2^n$ (with rounding toward negative infinity).
+
+In Java, \texttt{>>} is the signed/arithmetic right shift operator.
+
+\begin{lstlisting}[style=javastyle]
+int rd_value = op1 >> shiftAmount;
+int x31_value = op1 << (32 - shiftAmount); // bits shifted out
+\end{lstlisting}
+
+\subsection{Memory Instructions}
+
+\subsubsection{load -- Load Word from Memory}
+
+\begin{tcolorbox}[colback=yellow!5, colframe=yellow!50!black]
+\textbf{Format}: R2I-Type
+
+\textbf{Assembly}: \texttt{load \%rs1, imm, \%rd}
+
+\textbf{Semantics}: \texttt{rd = memory[rs1 + imm]}
+
+\textbf{Opcode}: 10110 (22)
+\end{tcolorbox}
+
+Loads a 32-bit word from main memory at address \texttt{rs1 + imm} into register \texttt{rd}.
+
+\textbf{EX stage}: Compute effective address = value of rs1 + immediate.
+
+\textbf{MA stage}: Read \texttt{memory[effective\_address]} and pass the loaded value forward.
+
+\textbf{RW stage}: Write the loaded value to register \texttt{rd}.
+
+\textbf{Example}: \texttt{load \%x0, \$a, \%x4}
+\begin{itemize}
+    \item \texttt{rs1 = x0} (value 0)
+    \item \texttt{imm = address of label a} (e.g., 0)
+    \item Effective address = 0 + 0 = 0
+    \item \texttt{x4 = memory[0]}
+\end{itemize}
+
+\subsubsection{store -- Store Word to Memory}
+
+\begin{tcolorbox}[colback=yellow!5, colframe=yellow!50!black]
+\textbf{Format}: R2I-Type
+
+\textbf{Assembly}: \texttt{store \%rs1, imm, \%rd}
+
+\textbf{Semantics}: \texttt{memory[rd + imm] = rs1}
+
+\textbf{Opcode}: 10111 (23)
+\end{tcolorbox}
+
+Stores the value of register \texttt{rs1} into main memory at address \texttt{rd + imm}.
+
+\textbf{Important}: Note the asymmetry with \texttt{load}. In \texttt{store}, the destination register \texttt{rd} is used as part of the \textbf{address} calculation (not as the register to write to). The value to store comes from \texttt{rs1}.
+
+\textbf{EX stage}: Compute effective address = value of rd + immediate.
+
+\textbf{MA stage}: Write value of rs1 to \texttt{memory[effective\_address]}.
+
+\textbf{RW stage}: No register write needed.
+
+\subsection{Control Flow Instructions -- Detailed}
+
+\subsubsection{jmp -- Unconditional Jump}
+
+\begin{tcolorbox}[colback=red!5, colframe=red!50!black]
+\textbf{Format}: RI-Type
+
+\textbf{Assembly}: \texttt{jmp label} or \texttt{jmp \%rd} (one of rd or imm is used, the other is 0)
+
+\textbf{Semantics}: \texttt{PC = PC + rd + imm}
+
+\textbf{Opcode}: 11000 (24)
+\end{tcolorbox}
+
+\textbf{Critical note from ISA spec}: In assembly, either \texttt{rd} or \texttt{imm} is used. In machine code, the unused one is set to zero. In the ParsedProgram, the used one is placed in the \texttt{destinationOperand} field.
+
+The new PC is computed as: $\text{PC}_{\text{new}} = \text{PC}_{\text{current}} + \text{rd} + \text{imm}$
+
+Since PC was already incremented during IF, the actual value of ``PC'' here refers to the PC \emph{before} increment, i.e., the address of the \texttt{jmp} instruction itself. This must be handled carefully during implementation.
+
+\subsubsection{beq -- Branch if Equal}
+
+\begin{tcolorbox}[colback=red!5, colframe=red!50!black]
+\textbf{Format}: R2I-Type
+
+\textbf{Assembly}: \texttt{beq \%rs1, \%rd, label}
+
+\textbf{Semantics}: If \texttt{rs1 == rd}, then \texttt{PC = PC + imm}
+
+\textbf{Opcode}: 11001 (25)
+\end{tcolorbox}
+
+\textbf{ParsedProgram representation}: The two registers being compared (\texttt{rs1} and \texttt{rd} in assembly notation) are placed in \texttt{sourceOperand1} and \texttt{sourceOperand2}. The label/offset is placed in \texttt{destinationOperand}.
+
+\subsubsection{bne -- Branch if Not Equal}
+
+\begin{tcolorbox}[colback=red!5, colframe=red!50!black]
+\textbf{Semantics}: If \texttt{rs1 != rd}, then \texttt{PC = PC + imm}
+
+\textbf{Opcode}: 11010 (26)
+\end{tcolorbox}
+
+\subsubsection{blt -- Branch if Less Than}
+
+\begin{tcolorbox}[colback=red!5, colframe=red!50!black]
+\textbf{Semantics}: If \texttt{rs1 < rd}, then \texttt{PC = PC + imm}
+
+\textbf{Opcode}: 11011 (27)
+\end{tcolorbox}
+
+\subsubsection{bgt -- Branch if Greater Than}
+
+\begin{tcolorbox}[colback=red!5, colframe=red!50!black]
+\textbf{Semantics}: If \texttt{rs1 > rd}, then \texttt{PC = PC + imm}
+
+\textbf{Opcode}: 11100 (28)
+\end{tcolorbox}
+
+\subsection{Special Instruction: end}
+
+\begin{tcolorbox}[colback=gray!10, colframe=gray!50!black]
+\textbf{Format}: RI-Type
+
+\textbf{Assembly}: \texttt{end}
+
+\textbf{Semantics}: Terminate program execution.
+
+\textbf{Opcode}: 11101 (29)
+
+Both \texttt{rd} and \texttt{imm} fields are unused (set to 0).
+\end{tcolorbox}
+
+When the \texttt{end} instruction reaches the RW stage, the simulator calls \texttt{Simulator.setSimulationComplete(true)} to break the simulation loop.
+
+% ===========================================================================
+\section{Object File Format}
+% ===========================================================================
+
+The ToyRISC assembler converts assembly programs into object files (binary format). The object file is what the simulator reads and loads into memory.
+
+\subsection{Structure}
+
+The object file contains a sequence of integers (one per line in text representation, or as binary data):
+
+\begin{enumerate}
+    \item The first integer is the \textbf{address of the first instruction} (i.e., the value to set PC to). This equals $N_d$, the number of data words.
+    \item The subsequent integers are the data and code words, in order. Data words come first (addresses 0 to $N_d - 1$), followed by code words (addresses $N_d$ to $N_t - 1$).
+\end{enumerate}
+
+\subsection{Loading the Object File}
+
+The \texttt{loadProgram()} function in \texttt{Simulator.java} must:
+
+\begin{enumerate}
+    \item Open the object file.
+    \item Read the first integer: this is $N_d$, the start address of the text segment.
+    \item Read all subsequent integers and store them sequentially in memory starting at address 0.
+    \item Set \texttt{PC = $N_d$} (address of the first instruction).
+    \item Set \texttt{x0 = 0}, \texttt{x1 = 65535}, \texttt{x2 = 65535}.
+\end{enumerate}
+
+\begin{lstlisting}[style=javastyle, caption={Loading the program (conceptual)}]
+static void loadProgram(String objectFile) {
+    // Read the object file
+    Scanner scanner = new Scanner(new File(objectFile));
+
+    // First value = PC (address of first instruction)
+    int firstInstructionAddress = scanner.nextInt();
+
+    // Load data and instructions into memory
+    int address = 0;
+    while (scanner.hasNextInt()) {
+        processor.getMainMemory()
+            .setWord(address, scanner.nextInt());
+        address++;
+    }
+
+    // Set PC to the first instruction
+    processor.getRegisterFile()
+        .setProgramCounter(firstInstructionAddress);
+
+    // Initialize special registers
+    processor.getRegisterFile().setValue(0, 0);      // x0 = 0
+    processor.getRegisterFile().setValue(1, 65535);   // x1 = SP
+    processor.getRegisterFile().setValue(2, 65535);   // x2 = FP
+}
+\end{lstlisting}
+
+% ===========================================================================
+\section{Assembly Language Syntax}
+% ===========================================================================
+
+\subsection{Directives}
+
+\begin{itemize}
+    \item \texttt{.data}: Marks the beginning of the static data segment.
+    \item \texttt{.text}: Marks the beginning of the code segment.
+\end{itemize}
+
+\subsection{Labels}
+
+Labels are symbolic names for memory addresses. They make assembly programs readable.
+
+\begin{itemize}
+    \item A label is defined by placing a name followed by a colon at the beginning of a line: \texttt{loop:}
+    \item Labels in the \texttt{.data} section refer to data addresses. \texttt{a:} followed by \texttt{123} means address 0 contains 123.
+    \item Labels in the \texttt{.text} section refer to instruction addresses.
+    \item The special label \texttt{main:} indicates the program entry point.
+    \item In instructions, labels are prefixed with \texttt{\$}: \texttt{load \%x0, \$a, \%x4}
+\end{itemize}
+
+\subsection{Operand Notation}
+
+\begin{longtable}{p{3cm}p{3cm}p{7cm}}
+\toprule
+\textbf{Prefix} & \textbf{Type} & \textbf{Example} \\
+\midrule
+\texttt{\%} & Register & \texttt{\%x3} refers to register x3 \\
+\texttt{\$} & Label (address) & \texttt{\$a} refers to the address named `a' \\
+(none) & Immediate & \texttt{42} is the integer constant 42 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Instruction Ordering}
+
+In assembly, the destination operand is always written \textbf{last}:
+
+\texttt{add \%x3, \%x4, \%x5} means \texttt{x5 = x3 + x4} (destination is x5, written last).
+
+This is opposite to some other ISAs (e.g., x86, where the destination is written first).
+
+% ===========================================================================
+\section{Complete Encoding Example}
+% ===========================================================================
+
+Let us manually encode the ``Adding Two Numbers'' program:
+
+\begin{lstlisting}[style=asmstyle, caption={Adding Two Numbers}]
+.data
+a:
+    123
+    234
+.text
+main:
+    load %x0, $a, %x4      ; x4 = memory[x0 + 0] = 123
+    addi %x0, 1, %x3       ; x3 = x0 + 1 = 1
+    load %x3, $a, %x5      ; x5 = memory[x3 + 0] = memory[1] = 234
+    add %x4, %x5, %x6      ; x6 = x4 + x5 = 123 + 234 = 357
+    end
+\end{lstlisting}
+
+\subsection{Data Segment}
+
+\begin{itemize}
+    \item Address 0: 123
+    \item Address 1: 234
+\end{itemize}
+
+$N_d = 2$ (2 data words). Instructions start at address 2.
+
+\subsection{Instruction Encoding}
+
+\subsubsection{Instruction 1: \texttt{load \%x0, \$a, \%x4}}
+
+\begin{itemize}
+    \item Opcode: \texttt{load} = 10110 = 22
+    \item Format: R2I-Type
+    \item rs1 = x0 = 00000
+    \item rd = x4 = 00100
+    \item imm = address of \texttt{a} = 0 = 00000000000000000 (17 bits)
+\end{itemize}
+
+Binary: \texttt{10110 00000 00100 00000000000000000}
+
+As 32-bit integer: $10110\;00000\;00100\;0\ldots0_2 = (22 \ll 27) | (0 \ll 22) | (4 \ll 17) | 0$
+
+$= 22 \times 2^{27} + 0 + 4 \times 2^{17} + 0 = 2952790016 + 524288 = -1341653504$ (in signed 32-bit)
+
+\subsubsection{Instruction 2: \texttt{addi \%x0, 1, \%x3}}
+
+\begin{itemize}
+    \item Opcode: \texttt{addi} = 00001 = 1
+    \item Format: R2I-Type
+    \item rs1 = x0 = 00000
+    \item rd = x3 = 00011
+    \item imm = 1 = 00000000000000001
+\end{itemize}
+
+Binary: \texttt{00001 00000 00011 00000000000000001}
+
+\subsubsection{Instruction 3: \texttt{load \%x3, \$a, \%x5}}
+
+\begin{itemize}
+    \item Opcode: \texttt{load} = 10110 = 22
+    \item rs1 = x3 = 00011
+    \item rd = x5 = 00101
+    \item imm = 0
+\end{itemize}
+
+\subsubsection{Instruction 4: \texttt{add \%x4, \%x5, \%x6}}
+
+\begin{itemize}
+    \item Opcode: \texttt{add} = 00000 = 0
+    \item Format: R3-Type
+    \item rs1 = x4 = 00100
+    \item rs2 = x5 = 00101
+    \item rd = x6 = 00110
+    \item unused = 000000000000
+\end{itemize}
+
+Binary: \texttt{00000 00100 00101 00110 000000000000}
+
+\subsubsection{Instruction 5: \texttt{end}}
+
+\begin{itemize}
+    \item Opcode: \texttt{end} = 11101 = 29
+    \item Format: RI-Type
+    \item rd = 0, imm = 0
+\end{itemize}
+
+Binary: \texttt{11101 00000 0000000000000000000000}
+
+\subsection{Object File}
+
+The complete object file would contain:
+\begin{verbatim}
+2       (first instruction address = Nd)
+123     (data: memory[0])
+234     (data: memory[1])
+-1341653504   (instruction: load at memory[2])
+...     (instruction: addi at memory[3])
+...     (instruction: load at memory[4])
+...     (instruction: add at memory[5])
+...     (instruction: end at memory[6])
+\end{verbatim}
+
+% ===========================================================================
+\section{Instruction Decode Logic -- Implementation Theory}
+% ===========================================================================
+
+The Operand Fetch (OF) stage must decode the 32-bit instruction and extract all necessary fields. Here is a systematic approach:
+
+\subsection{Step 1: Extract the Opcode}
+
+\begin{lstlisting}[style=javastyle]
+int instruction = IF_OF_Latch.getInstruction();
+int opcode = (instruction >>> 27) & 0x1F;
+\end{lstlisting}
+
+\subsection{Step 2: Determine the Format}
+
+\begin{lstlisting}[style=javastyle]
+// R3-Type: opcodes 0,2,4,6,8,10,12,14,16,18,20
+// R2I-Type: opcodes 1,3,5,7,9,11,13,15,17,19,21,22,23,25,26,27,28
+// RI-Type: opcodes 24, 29
+boolean isR3Type = (opcode <= 21 && opcode % 2 == 0);
+boolean isRIType = (opcode == 24 || opcode == 29);
+boolean isR2IType = !isR3Type && !isRIType;
+\end{lstlisting}
+
+\subsection{Step 3: Extract Fields Based on Format}
+
+\begin{lstlisting}[style=javastyle]
+if (isR3Type) {
+    int rs1 = (instruction >>> 22) & 0x1F;
+    int rs2 = (instruction >>> 17) & 0x1F;
+    int rd  = (instruction >>> 12) & 0x1F;
+    // Read register values
+    int val_rs1 = registerFile.getValue(rs1);
+    int val_rs2 = registerFile.getValue(rs2);
+} else if (isR2IType) {
+    int rs1 = (instruction >>> 22) & 0x1F;
+    int rd  = (instruction >>> 17) & 0x1F;
+    int imm = instruction & 0x1FFFF; // 17-bit immediate
+    // Sign extend
+    if ((imm & (1 << 16)) != 0)
+        imm = imm | 0xFFFE0000;
+    int val_rs1 = registerFile.getValue(rs1);
+} else { // RI-Type
+    int rd  = (instruction >>> 22) & 0x1F;
+    int imm = instruction & 0x3FFFFF; // 22-bit immediate
+    // Sign extend
+    if ((imm & (1 << 21)) != 0)
+        imm = imm | 0xFFC00000;
+}
+\end{lstlisting}
+
+\subsection{Step 4: Handle Special Cases for Branches}
+
+For conditional branches (\texttt{beq}, \texttt{bne}, \texttt{blt}, \texttt{bgt}), the ISA specification says:
+
+\begin{quote}
+``In ParsedProgram, for conditional branches, the two registers that are compared are placed in sourceOperand1 and sourceOperand2. The imm value is placed in destinationOperand.''
+\end{quote}
+
+This means:
+\begin{itemize}
+    \item \texttt{sourceOperand1} = value of rs1
+    \item \texttt{sourceOperand2} = value of rd (not the immediate!)
+    \item \texttt{destinationOperand} = the immediate offset
+\end{itemize}
+
+The OF/EX latch must be designed to carry all this information.
+
+\vspace{2cm}
+\begin{center}
+\textit{End of Part 2. Continue to Part 3 for complete simulator architecture, code walkthrough, test program analysis, and implementation guide.}
+\end{center}
+
+\end{document}
