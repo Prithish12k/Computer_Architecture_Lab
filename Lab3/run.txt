@@ -1,0 +1,1 @@
+java -jar jars/simulator.jar src/configuration/config.xml testcase.stat test_cases/testcase.out
