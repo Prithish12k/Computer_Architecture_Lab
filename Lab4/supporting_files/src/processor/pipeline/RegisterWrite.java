@@ -45,8 +45,12 @@ public class RegisterWrite {
 				int rd = instruction.getDestinationOperand().getValue();
 				containingProcessor.getRegisterFile().setValue(rd, MA_RW_Latch.getALu());
 				containingProcessor.getRegisterFile().setRegisterBusy(rd, false);
-				// div/divi also wrote remainder to x31 — clear its busy flag
-				if (op.equals("div") || op.equals("divi")) {
+				// div/divi write remainder to x31; shifts write shifted-out bits to x31
+				if (op.equals("div") || op.equals("divi")
+						|| op.equals("sll") || op.equals("slli")
+						|| op.equals("srl") || op.equals("srli")
+						|| op.equals("sra") || op.equals("srai")) {
+					containingProcessor.getRegisterFile().setValue(31, MA_RW_Latch.getX31Result());
 					containingProcessor.getRegisterFile().setRegisterBusy(31, false);
 				}
 			}

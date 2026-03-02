@@ -20,31 +20,54 @@ public class Execute {
 		this.IF_OF_Latch = iF_OF_Latch;
 	}
 
-	public void performEX()
-	{
-		//TODO
+	public void performEX() {
+		// TODO
 		boolean is_jumped = false;
-		if(OF_EX_Latch.isEX_enable()){
+		if (OF_EX_Latch.isEX_enable()) {
 
-			//Working with instruction which we got from OF_EX_Latch()
+			// Working with instruction which we got from OF_EX_Latch()
 			Instruction inst = OF_EX_Latch.getInstruction();
 			EX_MA_Latch.setInstruction(inst);
 
 			String opType = inst.getOperationType().toString();
 
-			//programCounter from RegisterFile (In InstructionFetch.java pcnow was set as (currentpc + 1))
+			// programCounter from RegisterFile (In InstructionFetch.java pcnow was set as
+			// (currentpc + 1))
 			int pcnow = inst.getProgramCounter();
 
-			//Finding alu
+			// Finding alu
 			int alu = 0;
-			if(opType.equals("addi") || opType.equals("subi") || opType.equals("muli") || opType.equals("divi") || opType.equals("andi") || opType.equals("ori") || opType.equals("xori") || opType.equals("slti") || opType.equals("slli") || opType.equals("srli") || opType.equals("srai") || opType.equals("load") || opType.equals("store")){
-				
-				//getting values of register and immediates for operation R2I
-				int rs1 = containingProcessor.getRegisterFile().getValue(inst.getSourceOperand1().getValue()); // Getting value from register file, register number stored in Operand (Which is set at RegisterWrite.java) (while x0 is defined initially in Simulator.java)
+			if (opType.equals("addi") || opType.equals("subi") || opType.equals("muli") || opType.equals("divi")
+					|| opType.equals("andi") || opType.equals("ori") || opType.equals("xori") || opType.equals("slti")
+					|| opType.equals("slli") || opType.equals("srli") || opType.equals("srai") || opType.equals("load")
+					|| opType.equals("store")) {
+
+				// getting values of register and immediates for operation R2I
+				int rs1 = containingProcessor.getRegisterFile().getValue(inst.getSourceOperand1().getValue()); // Getting
+																												// value
+																												// from
+																												// register
+																												// file,
+																												// register
+																												// number
+																												// stored
+																												// in
+																												// Operand
+																												// (Which
+																												// is
+																												// set
+																												// at
+																												// RegisterWrite.java)
+																												// (while
+																												// x0 is
+																												// defined
+																												// initially
+																												// in
+																												// Simulator.java)
 				int rd = containingProcessor.getRegisterFile().getValue(inst.getDestinationOperand().getValue());
 				int immed = inst.getSourceOperand2().getValue();
 
-				switch(opType){
+				switch (opType) {
 					case "addi":
 						alu = rs1 + immed;
 						break;
@@ -52,14 +75,14 @@ public class Execute {
 						alu = rs1 - immed;
 						break;
 					case "muli":
-						alu = rs1*immed;
+						alu = rs1 * immed;
 						break;
 					case "divi":
-						alu = rs1/immed;
-						containingProcessor.getRegisterFile().setValue(31, rs1%immed); //Remember to set remainder at x31
+						alu = rs1 / immed;
+						EX_MA_Latch.setX31Result(rs1 % immed); // remainder stored in latch, written in RW
 						break;
 					case "andi":
-						alu = rs1&immed;
+						alu = rs1 & immed;
 						break;
 					case "xori":
 						alu = rs1 ^ immed;
@@ -69,34 +92,43 @@ public class Execute {
 						break;
 					case "slti":
 						alu = 0;
-						if(immed > rs1) alu = 1;
+						if (immed > rs1)
+							alu = 1;
 						break;
-					case "slli": 
+					case "slli":
 						alu = rs1 << immed;
+						EX_MA_Latch.setX31Result((immed > 0 && immed < 32) ? (rs1 >>> (32 - immed)) : 0); // shifted-out
+																											// bits
 						break;
-					case "srai": 
-						alu = rs1 >> immed; //arithmetic shift right
+					case "srai":
+						alu = rs1 >> immed; // arithmetic shift right
+						EX_MA_Latch.setX31Result((immed > 0 && immed < 32) ? (rs1 & ((1 << immed) - 1)) : 0); // shifted-out
+																												// bits
 						break;
-					case "srli": 
-						alu = rs1 >>> immed; //logical shift right
+					case "srli":
+						alu = rs1 >>> immed; // logical shift right
+						EX_MA_Latch.setX31Result((immed > 0 && immed < 32) ? (rs1 & ((1 << immed) - 1)) : 0); // shifted-out
+																												// bits
 						break;
 					case "load":
 						alu = rs1 + immed;
 						break;
 					case "store":
-						alu = rd + immed; //We took value from rd specially for it.
+						alu = rd + immed; // We took value from rd specially for it.
 						break;
-					default: 
+					default:
 						System.out.print("Problem in switch(OpType) for R2I");
 				}
-				
-			}else if(opType.equals("add") || opType.equals("sub") || opType.equals("mul") || opType.equals("div") || opType.equals("and") || opType.equals("or") || opType.equals("xor") || opType.equals("slt") || opType.equals("sll") || opType.equals("srl") || opType.equals("sra")){
-				
-				//Finding alu for register operations 
+
+			} else if (opType.equals("add") || opType.equals("sub") || opType.equals("mul") || opType.equals("div")
+					|| opType.equals("and") || opType.equals("or") || opType.equals("xor") || opType.equals("slt")
+					|| opType.equals("sll") || opType.equals("srl") || opType.equals("sra")) {
+
+				// Finding alu for register operations
 				int rs2 = containingProcessor.getRegisterFile().getValue(inst.getSourceOperand2().getValue());
 				int rs1 = containingProcessor.getRegisterFile().getValue(inst.getSourceOperand1().getValue());
 
-				switch(opType){
+				switch (opType) {
 					case "add":
 						alu = rs1 + rs2;
 						break;
@@ -108,9 +140,9 @@ public class Execute {
 						break;
 					case "div":
 						alu = rs1 / rs2;
-						containingProcessor.getRegisterFile().setValue(31, rs1%rs2); //Remember setting value in register file
+						EX_MA_Latch.setX31Result(rs1 % rs2); // remainder stored in latch, written in RW
 						break;
-					case "and": 
+					case "and":
 						alu = rs1 & rs2;
 						break;
 					case "xor":
@@ -121,99 +153,115 @@ public class Execute {
 						break;
 					case "sll":
 						alu = rs1 << rs2;
+						EX_MA_Latch.setX31Result((rs2 > 0 && rs2 < 32) ? (rs1 >>> (32 - rs2)) : 0); // shifted-out bits
 						break;
 					case "slt":
 						alu = 0;
-						if(rs2 > rs1) alu = 1;
+						if (rs2 > rs1)
+							alu = 1;
 						break;
 					case "sra":
 						alu = rs1 >> rs2;
+						EX_MA_Latch.setX31Result((rs2 > 0 && rs2 < 32) ? (rs1 & ((1 << rs2) - 1)) : 0); // shifted-out
+																										// bits
 						break;
 					case "srl":
 						alu = rs1 >>> rs2;
+						EX_MA_Latch.setX31Result((rs2 > 0 && rs2 < 32) ? (rs1 & ((1 << rs2) - 1)) : 0); // shifted-out
+																										// bits
 						break;
 					default:
 						System.out.print("Issue in R3 switch");
-				}}
+				}
+			}
 
-			else if(opType.equals("jmp")){
+			else if (opType.equals("jmp")) {
 
-				//Specially for jmp
+				// Specially for jmp
 				OperandType jumpType = inst.getDestinationOperand().getOperandType();
 				int immed = 0;
 
-				//jmp instruction has either register or immediate as target
-				if(jumpType == OperandType.Immediate){
+				// jmp instruction has either register or immediate as target
+				if (jumpType == OperandType.Immediate) {
 					immed = inst.getDestinationOperand().getValue();
 				}
 
-				else{
-					immed = containingProcessor.getRegisterFile().getValue(inst.getDestinationOperand().getValue()); //Value corresponding to register (if present)
+				else {
+					immed = containingProcessor.getRegisterFile().getValue(inst.getDestinationOperand().getValue()); // Value
+																														// corresponding
+																														// to
+																														// register
+																														// (if
+																														// present)
 				}
-				
-				alu = immed + pcnow ; //line number where we have to go.
-				
+
+				alu = immed + pcnow; // line number where we have to go.
+
 				is_jumped = true;
 				EX_IF_Latch.setBranchEnabled(true);
 				EX_IF_Latch.setPC(alu);// Sending the value calculated to IF stage
-                IF_OF_Latch.setOF_enable(false);
-                Statistics.incrementWrongBranchCount();
-			}
-			else if(opType.equals("end")){
-				//Do nothing (To separate it so that it does not go to default error line in next else statement)
-			}
-			else{
+				IF_OF_Latch.setOF_enable(false);
+				Statistics.incrementWrongBranchCount();
+				Statistics.incrementInstructions();
+			} else if (opType.equals("end")) {
+				// Do nothing (To separate it so that it does not go to default error line in
+				// next else statement)
+			} else {
 				// Conditional statement
 
-				//Setting register value
+				// Setting register value
 				int rs1 = containingProcessor.getRegisterFile().getValue(inst.getSourceOperand1().getValue());
 				int rs2 = containingProcessor.getRegisterFile().getValue(inst.getSourceOperand2().getValue());
 				int immed = inst.getDestinationOperand().getValue();
-				
-				switch(opType){
+
+				switch (opType) {
 					case "bgt":
-						if(rs1>rs2){
+						if (rs1 > rs2) {
 							alu = pcnow + immed;
 
 							// Enabling EX_IF_LatchType
 							is_jumped = true;
 							EX_IF_Latch.setBranchEnabled(true);
 							EX_IF_Latch.setPC(alu);
-                            IF_OF_Latch.setOF_enable(false);
-                            Statistics.incrementWrongBranchCount();
+							IF_OF_Latch.setOF_enable(false);
+							Statistics.incrementWrongBranchCount();
+							Statistics.incrementInstructions();
 						}
 						break;
 					case "beq":
-						if(rs1==rs2){
+						if (rs1 == rs2) {
 							alu = pcnow + immed;
 
 							is_jumped = true;
 							EX_IF_Latch.setBranchEnabled(true);
 							EX_IF_Latch.setPC(alu);
-                            IF_OF_Latch.setOF_enable(false);
-                            Statistics.incrementWrongBranchCount();
+							IF_OF_Latch.setOF_enable(false);
+							Statistics.incrementWrongBranchCount();
+							Statistics.incrementInstructions();
 						}
 						break;
 					case "blt":
-						if(rs1<rs2){
+						if (rs1 < rs2) {
 							alu = pcnow + immed;
 
 							is_jumped = true;
 							EX_IF_Latch.setBranchEnabled(true);
 							EX_IF_Latch.setPC(alu);
-                            IF_OF_Latch.setOF_enable(false);
-                            Statistics.incrementWrongBranchCount();
+							IF_OF_Latch.setOF_enable(false);
+							Statistics.incrementWrongBranchCount();
+							Statistics.incrementInstructions();
 						}
 						break;
 					case "bne":
-						if(rs1!=rs2){
+						if (rs1 != rs2) {
 							alu = pcnow + immed;
 
 							is_jumped = true;
 							EX_IF_Latch.setBranchEnabled(true);
 							EX_IF_Latch.setPC(alu);
-                            IF_OF_Latch.setOF_enable(false);
-                            Statistics.incrementWrongBranchCount();
+							IF_OF_Latch.setOF_enable(false);
+							Statistics.incrementWrongBranchCount();
+							Statistics.incrementInstructions();
 						}
 						break;
 					default:
@@ -222,19 +270,19 @@ public class Execute {
 				}
 			}
 
-			EX_MA_Latch.setAlu(alu); //sending alu for MA
+			EX_MA_Latch.setAlu(alu); // sending alu for MA
 
-			OF_EX_Latch.setEX_enable(false); //Setting previous latch to be off
+			OF_EX_Latch.setEX_enable(false); // Setting previous latch to be off
 
-			//Next latch is turned on only if no branch statement
-			if(is_jumped==false){
+			// Next latch is turned on only if no branch statement
+			if (is_jumped == false) {
 				EX_MA_Latch.setMA_enable(true);
 			} else {
 				EX_MA_Latch.setMA_enable(false);
 			}
 
 		} else {
-            EX_MA_Latch.setMA_enable(false);
-        }
+			EX_MA_Latch.setMA_enable(false);
+		}
 	}
 }

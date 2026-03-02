@@ -301,7 +301,11 @@ public class OperandFetch {
 						containingProcessor.getRegisterFile().setRegisterBusy(destReg, true);
 					}
 					// div/divi also write remainder to x31 as a side-effect
-					if (opInst == OperationType.div || opInst == OperationType.divi) {
+					// shifts also write shifted-out bits to x31 as a side-effect
+					if (opInst == OperationType.div || opInst == OperationType.divi
+							|| opInst == OperationType.sll || opInst == OperationType.slli
+							|| opInst == OperationType.srl || opInst == OperationType.srli
+							|| opInst == OperationType.sra || opInst == OperationType.srai) {
 						containingProcessor.getRegisterFile().setRegisterBusy(31, true);
 					}
 				}
