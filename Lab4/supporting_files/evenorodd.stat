@@ -1,0 +1,6 @@
+Number of instructions executed = 6
+Number of cycles taken = 16
+IPC = 0.375
+CPI = 2.6666667
+Number of Data Hazard Stalls = 6
+Number of Wrong Branch Instructions that entered the pipeline = 0

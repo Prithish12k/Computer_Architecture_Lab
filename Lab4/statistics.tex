@@ -1,0 +1,52 @@
+\documentclass[12pt]{article}
+\usepackage[a4paper, margin=1in, landscape]{geometry}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{array}
+
+\definecolor{headerblue}{HTML}{1a2744}
+\definecolor{altrow}{HTML}{eef4fc}
+
+\begin{document}
+\begin{center}
+    {\Large \textbf{Computer Architecture}}\\[0.5cm]
+    Prithish Chaudhary\\[0.2cm]
+    February 2026
+\end{center}
+\vspace{0.8cm}
+\section*{Performance Statistics Summary}
+\begin{table}[h]
+    \centering
+    \renewcommand{\arraystretch}{1.6}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{3cm}
+                    >{\centering\arraybackslash}p{3cm}
+                    >{\centering\arraybackslash}p{3cm}
+                    >{\centering\arraybackslash}p{3cm}
+                    >{\centering\arraybackslash}p{3cm}
+                    >{\centering\arraybackslash}p{3cm}
+                    >{\centering\arraybackslash}p{3cm}}
+        \toprule
+        \rowcolor{headerblue}
+        \color{white}\textbf{Benchmark} & 
+        \color{white}\textbf{Instructions} & 
+        \color{white}\textbf{Cycles} & 
+        \color{white}\textbf{IPC} & 
+        \color{white}\textbf{CPI} & 
+        \color{white}\textbf{Hazard Stalls} & 
+        \color{white}\textbf{Wrong Branch Instr.}\\
+        \midrule
+        \rowcolor{altrow}
+        descending.out & 189 & 443 & 0.422 & 2.344 & 74  & 176 \\
+        evenorodd.out  & 6   & 16   & 0.375 & 2.667 & 6   & 0   \\
+        \rowcolor{altrow}
+        fibonacci.out  & 62  & 118  & 0.525 & 1.903 & 20  & 32  \\
+        palindrome.out & 42  & 107  & 0.392 & 2.547 & 47  & 14  \\
+        \rowcolor{altrow}
+        prime.out      & 24  & 53  & 0.453 & 2.208 & 15   & 10  \\
+        \bottomrule
+    \end{tabular}
+    \caption{Execution metrics for various benchmark programs.}
+    \label{tab:metrics}
+\end{table}
+\end{document}
